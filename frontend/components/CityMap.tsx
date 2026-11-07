@@ -1351,7 +1351,13 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       const places: Place[] = (data.places || []).filter((place: Place) => !bounds || bounds.contains([place.lng, place.lat]));
       setSearchResults(places);
       updatePlacesGeoJSON(places);
-      if (places.length === 0) setMapError(`No ${category} places were found in this map view. Pan or zoom out to search another area.`);
+      if (places.length === 0) {
+        setMapError(
+          category === "temple"
+            ? "No OpenStreetMap worship records were found in this view. Satellite labels may come from Google and are not searchable map features."
+            : `No ${category} places were found in this map view. Pan or zoom out to search another area.`,
+        );
+      }
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         setMapError(error instanceof Error ? error.message : "Nearby places could not be loaded");
