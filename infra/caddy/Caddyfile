@@ -1,0 +1,27 @@
+# Serves the web app and local styles. The browser basemap comes from OpenFreeMap.
+# Port 80 inside the container (map a host port to it, e.g. -p 8090:80).
+:80 {
+	header Access-Control-Allow-Origin *
+	# Do NOT gzip binary .pbf tiles — Caddy's file_server would also set
+	# Content-Encoding: gzip, which corrupts protobuf parsing in some clients.
+	encode gzip {
+		match {
+			header Accept-Encoding gzip
+			header Content-Type text/*
+			header Content-Type application/json
+		}
+	}
+	log
+
+	# Map styles
+	handle /styles/* {
+		root * /srv
+		file_server
+	}
+
+	# Web app (everything else)
+	handle {
+		root * /srv/web
+		file_server
+	}
+}

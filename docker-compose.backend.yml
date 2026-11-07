@@ -1,0 +1,141 @@
+name: city-maps-backend
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [maps-backend]
+
+services:
+  postgis:
+    <<: *service-defaults
+    image: postgis/postgis:16-3.4
+    shm_size: 2gb
+    mem_limit: 12g
+    cpus: 10
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-maps}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-maps}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=3GB
+      - -c
+      - effective_cache_size=9GB
+      - -c
+      - maintenance_work_mem=1GB
+      - -c
+      - max_connections=150
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-maps} -d ${POSTGRES_DB:-maps}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+
+  redis:
+    <<: *service-defaults
+    image: redis:7.4-alpine
+    mem_limit: 1g
+    cpus: 2
+    command: ["redis-server", "--maxmemory", "768mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+
+  meilisearch:
+    <<: *service-defaults
+    image: getmeili/meilisearch:v1.11
+    mem_limit: 7g
+    cpus: 6
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?Set MEILI_MASTER_KEY in .env}
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_MAX_INDEXING_MEMORY: 5GiB
+      MEILI_MAX_INDEXING_THREADS: 6
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - meili_data:/meili_data
+
+  photon:
+    <<: *service-defaults
+    image: komoot/photon:0.6.2
+    mem_limit: 3g
+    cpus: 4
+    environment:
+      JAVA_OPTS: -Xms1g -Xmx2500m
+    volumes:
+      - photon_data:/photon/photon_data
+
+  valhalla:
+    <<: *service-defaults
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    mem_limit: 6g
+    cpus: 8
+    environment:
+      tile_urls: ""
+      serve_tiles: "True"
+      build_tiles: "False"
+      force_rebuild: "False"
+      server_threads: 8
+    volumes:
+      - ./data/${CITY_SLUG:-trichy}/valhalla:/custom_files
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8002/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  api:
+    <<: *service-defaults
+    build:
+      context: ./backend
+    mem_limit: 4g
+    cpus: 8
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://maps:${POSTGRES_PASSWORD}@postgis:5432/maps}
+      REDIS_URL: redis://redis:6379/0
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      VALHALLA_URL: http://valhalla:8002
+      PHOTON_URL: http://photon:2322
+      TRAFFIC_API_KEY: ${TRAFFIC_API_KEY:?Set TRAFFIC_API_KEY in .env}
+      CITY_NAME: ${CITY_NAME:-Tiruchirappalli}
+      CITY_BBOX: ${CITY_BBOX:-78.55,10.68,78.85,10.95}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgis: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      meilisearch: {condition: service_healthy}
+      valhalla: {condition: service_healthy}
+
+  importer:
+    <<: *service-defaults
+    image: iboates/osm2pgsql:2.1.1
+    profiles: ["tools"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./data:/maps:ro
+    entrypoint: ["osm2pgsql"]
+
+networks:
+  maps-backend:
+
+volumes:
+  postgis_data:
+  redis_data:
+  meili_data:
+  photon_data:

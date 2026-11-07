@@ -1,0 +1,15 @@
+# Build output & data (large, regenerable)
+data/
+node_modules/
+.next/
+__pycache__/
+*.pyc
+dist/
+.env
+
+# OS / editor
+.DS_Store
+*.log
+*.tsbuildinfo
+.commandcode/
+frontend/public/maplibre-gl-worker.mjs

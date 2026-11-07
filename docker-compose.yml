@@ -1,0 +1,57 @@
+# Local stack.
+#   docker compose up -d          -> Caddy serves the web app + basemap tiles
+#   docker compose --profile full up -d  -> also starts routing/geocoding (M2/M3)
+services:
+  caddy:
+    image: docker.io/library/caddy:2
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8090}:80"
+    volumes:
+      - ./web:/srv/web:ro
+      - ./styles:/srv/styles:ro
+      - ./data:/srv/data:ro
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # ---- dynamic services (enable with: --profile full) ----------------------
+  redis:
+    image: docker.io/library/redis:7-alpine
+    profiles: ["full"]
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  postgis:
+    image: docker.io/postgis/postgis:16-3.4
+    profiles: ["full"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: maps
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maps}
+      POSTGRES_DB: maps
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    profiles: ["full"]
+    restart: unless-stopped
+    volumes:
+      - ./data:/custom_files
+
+  nominatim:
+    image: docker.io/mediagis/nominatim:4.4
+    profiles: ["full"]
+    restart: unless-stopped
+    environment:
+      PBF_PATH: /data/${REGION:-trichy}.osm.pbf
+    volumes:
+      - ./data:/data
+      - nominatim_pgdata:/var/lib/postgresql/16/main
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:
+  nominatim_pgdata:

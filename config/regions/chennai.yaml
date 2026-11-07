@@ -1,0 +1,14 @@
+name: Chennai
+slug: chennai
+
+osm:
+  source: "https://download.geofabrik.de/asia/india/southern-zone-latest.osm.pbf"
+  clip: bbox
+  bbox: [79.95, 12.75, 80.40, 13.35]
+
+view:
+  center: [80.2707, 13.0827]
+  zoom: 13
+
+map:
+  max_bounds: [[79.95, 12.75], [80.40, 13.35]]

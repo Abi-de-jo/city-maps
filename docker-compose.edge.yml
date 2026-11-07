@@ -1,0 +1,51 @@
+name: city-maps-edge
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
+        NEXT_PUBLIC_CITY_SLUG: ${CITY_SLUG:-trichy}
+        NEXT_PUBLIC_MAP_CENTER_LNG: ${NEXT_PUBLIC_MAP_CENTER_LNG:-78.7047}
+        NEXT_PUBLIC_MAP_CENTER_LAT: ${NEXT_PUBLIC_MAP_CENTER_LAT:-10.7905}
+        NEXT_PUBLIC_MAP_ZOOM: ${NEXT_PUBLIC_MAP_ZOOM:-13}
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    volumes:
+      - ./data:/data:ro
+    networks: [maps-edge]
+
+  caddy:
+    build:
+      context: ./infra/caddy
+      dockerfile: Dockerfile.edge
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      BACKEND_ORIGIN: ${BACKEND_ORIGIN:?Set BACKEND_ORIGIN to the private Node A URL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/caddy/Caddyfile.edge:/etc/caddy/Caddyfile:ro
+      - ./data:/srv/data:ro
+      - ./styles:/srv/styles:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [frontend]
+    networks: [maps-edge]
+
+networks:
+  maps-edge:
+
+volumes:
+  caddy_data:
+  caddy_config:

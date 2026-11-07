@@ -1,0 +1,14 @@
+name: Tiruchirappalli
+slug: trichy
+
+osm:
+  source: "https://download.geofabrik.de/asia/india/southern-zone-latest.osm.pbf"
+  clip: bbox
+  bbox: [78.55, 10.68, 78.85, 10.95]
+
+view:
+  center: [78.7047, 10.7905]
+  zoom: 13
+
+map:
+  max_bounds: [[78.45, 10.60], [78.95, 11.05]]

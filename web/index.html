@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <script>
+    if (location.hostname === "localhost" && location.port === "8090") {
+      location.replace("http://localhost:3000/" + location.search + location.hash);
+    }
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Maps</title>
+  <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    #map { background: #f8f9fa; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/pmtiles@3/dist/pmtiles.js"></script>
+  <script>
+    // Helpful overlay: surfaces map errors and tile-byte samples in-browser.
+    (function () {
+      const el = document.createElement("div");
+      el.id = "mapdebug";
+      el.style.cssText =
+        "position:fixed;left:8px;bottom:8px;z-index:9999;max-width:48vw;" +
+        "font:11px/1.4 monospace;white-space:pre-wrap;color:#111;" +
+        "background:rgba(255,255,255,.94);padding:6px 8px;border:1px solid #999";
+      const errs = [];
+      window.__maperrs = errs;
+      const origError = console.error;
+      console.error = function (a) {
+        if (errs.length < 15)
+          errs.push(a && a.message ? a.message : String(a));
+        return origError.apply(console, arguments);
+      };
+      window.addEventListener("error", (e) => {
+        if (errs.length < 15) errs.push("window.onerror: " + e.message);
+      });
+      const render = () => {
+        const lines = ["ERRORS:"];
+        for (const e of errs.slice(0, 8)) lines.push("- " + e);
+        lines.push("TILES:");
+        for (const t of (window.__tileRequests || []).slice(0, 8))
+          lines.push(
+            "- " + t.size + " gz=" + t.gzipped + " " + (t.first || "")
+          );
+        el.textContent = lines.join("\n");
+      };
+      document.addEventListener(
+        "DOMContentLoaded",
+        () => {
+          document.body.appendChild(el);
+          setInterval(render, 800);
+        },
+        { once: true }
+      );
+    })();
+  </script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const region = params.get("region") || "trichy";
+    const styleUrl = params.get("style") || "/styles/google-like.json";
+    const tilePath = params.get("tile") || `/data/${region}/basemap.pmtiles`;
+
+    const tilesUrl = params.get("tiles") || "/tiles/{z}/{x}/{y}.pbf";
+
+    // Compact debug overlay for quick on-device diagnosis (shows map errors).
+    const debugEl = document.createElement("div");
+    debugEl.id = "mapdebug";
+    debugEl.style.cssText =
+      "position:fixed;left:8px;bottom:8px;z-index:9999;max-width:48vw;" +
+      "font:11px/1.4 monospace;white-space:pre-wrap;color:#111;" +
+      "background:rgba(255,255,255,.94);padding:6px 8px;border:1px solid #999";
+    const errs = [];
+    window.__maperrs = errs;
+    const origError = console.error;
+    console.error = function (a) {
+      if (errs.length < 15)
+        errs.push(a && a.message ? a.message : String(a));
+      return origError.apply(console, arguments);
+    };
+    window.addEventListener("error", (e) => {
+      if (errs.length < 15) errs.push("window.onerror: " + e.message);
+    });
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        document.body.appendChild(debugEl);
+        setInterval(() => {
+          const lines = ["ERRORS:"];
+          for (const e of errs.slice(0, 8)) lines.push("- " + e);
+          debugEl.textContent = lines.join("\n");
+        }, 800);
+      },
+      { once: true }
+    );
+
+    fetch(styleUrl)
+      .then((r) => r.json())
+      .then((style) => {
+        style.sources.openmaptiles = {
+          type: "vector",
+          tiles: [location.origin + tilesUrl],
+          attribution: "© OpenStreetMap contributors",
+          minzoom: 0,
+          maxzoom: 14,
+        };
+
+        const map = new maplibregl.Map({
+          container: "map",
+          style,
+          center: [
+            Number(params.get("lng")) || 78.7047,
+            Number(params.get("lat")) || 10.7905,
+          ],
+          zoom: Number(params.get("z")) || 13,
+          pitch: 45,
+          attributionControl: { compact: true },
+        });
+
+        window.__map = map;
+
+        map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }));
+        map.addControl(
+          new maplibregl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: true,
+          })
+        );
+
+        map.on("load", () => {
+          map.addLayer({
+            id: "building-3d",
+            source: "openmaptiles",
+            "source-layer": "building",
+            type: "fill-extrusion",
+            minzoom: 15,
+            paint: {
+              "fill-extrusion-color": "#d9d0c9",
+              "fill-extrusion-height": ["coalesce", ["get", "render_height"], 8],
+              "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+              "fill-extrusion-opacity": 0.85,
+            },
+          });
+        });
+      })
+      .catch((err) => {
+        document.body.innerHTML =
+          '<pre style="padding:1rem;font:14px monospace">Failed to load style: ' +
+          err +
+          "</pre>";
+      });
+  </script>
+</body>
+</html>
