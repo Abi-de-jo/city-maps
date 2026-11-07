@@ -286,7 +286,6 @@ type CityMapProps = {
 export default function CityMap({ city, initialCenter, initialZoom }: CityMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
   const routeBadgeMarkersRef = useRef<maplibregl.Marker[]>([]);
   const originMarkerRef = useRef<maplibregl.Marker | null>(null);
   const destMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -395,27 +394,26 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     }
   }, [city.id]);
 
-  const renderPlaceMarkers = useCallback((places: Place[]) => {
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
+  const updatePlacesGeoJSON = useCallback((places: Place[]) => {
     const map = mapRef.current;
     if (!map) return;
-    markersRef.current = places.map((place) => {
-      const element = document.createElement("button");
-      const marker = poiMarkerPresentation(place.category || "place");
-      element.className = `trichy-pin trichy-pin-${marker.kind}`;
-      element.type = "button";
-      element.setAttribute("aria-label", `${place.name}, ${place.category.replaceAll("_", " ")}`);
-      element.title = place.name;
-      element.innerHTML = marker.icon;
-      element.onclick = (event) => {
-        event.stopPropagation();
-        void openPlaceDetails(place);
-        map.flyTo({ center: [place.lng, place.lat], zoom: 17, pitch: 55 });
-      };
-      return new maplibregl.Marker({ element, anchor: "bottom" }).setLngLat([place.lng, place.lat]).addTo(map);
-    });
-  }, [openPlaceDetails]);
+    const source = map.getSource("places-source") as GeoJSONSource | undefined;
+    if (!source) return;
+    const featureCollection: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+      type: "FeatureCollection",
+      features: places.map((place) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [place.lng, place.lat] },
+        properties: {
+          place_id: place.place_id,
+          name: place.name,
+          category: place.category,
+          address: place.address || "",
+        },
+      })),
+    };
+    source.setData(featureCollection);
+  }, []);
 
   const updateOriginAndDest3DMarkers = useCallback((
     map: maplibregl.Map,
@@ -579,6 +577,49 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     map.addLayer({ id: "gmaps-building-2d", type: "fill", source: vectorSourceId, "source-layer": "building", minzoom: 13, paint: { "fill-color": "#f1f3f4", "fill-outline-color": "#dadce0", "fill-opacity": 0.85 } }, firstLabelLayerId);
     map.addLayer({ id: "gmaps-building-3d", type: "fill-extrusion", source: vectorSourceId, "source-layer": "building", minzoom: 14, paint: { "fill-extrusion-color": ["case", ["boolean", ["feature-state", "selected"], false], "#1a73e8", buildingColor], "fill-extrusion-height": ["*", buildingScale, ["coalesce", ["get", "render_height"], ["get", "height"], 9]], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], ["get", "min_height"], 0], "fill-extrusion-opacity": 0.92, "fill-extrusion-vertical-gradient": true } }, firstLabelLayerId);
+    map.addSource("places-source", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+      cluster: true,
+      clusterMaxZoom: 15,
+      clusterRadius: 50,
+    });
+    map.addLayer({
+      id: "clusters",
+      type: "circle",
+      source: "places-source",
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": ["step", ["get", "point_count"], "#51bbd6", 10, "#f1f075", 30, "#f28cb1"],
+        "circle-radius": ["step", ["get", "point_count"], 20, 10, 25, 30, 30],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+    map.addLayer({
+      id: "cluster-count",
+      type: "symbol",
+      source: "places-source",
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": "{point_count_abbreviated}",
+        "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-size": 13,
+      },
+      paint: { "text-color": "#202124" },
+    });
+    map.addLayer({
+      id: "unclustered-point",
+      type: "circle",
+      source: "places-source",
+      filter: ["!", ["has", "point_count"]],
+      paint: {
+        "circle-radius": 9,
+        "circle-color": "#ea4335",
+        "circle-stroke-width": 2.5,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
     if (!map.getSource("alt-route-source")) map.addSource("alt-route-source", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     if (!map.getSource("route-source")) map.addSource("route-source", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     if (!map.getSource("connector-source")) map.addSource("connector-source", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -658,6 +699,34 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     map.on("mouseenter", "alt-route-line", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "alt-route-line", () => { map.getCanvas().style.cursor = ""; });
+    map.on("click", "clusters", async (event: MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      if (!feature || feature.geometry.type !== "Point") return;
+      const clusterId = Number(feature.properties?.cluster_id);
+      if (!Number.isFinite(clusterId)) return;
+      const source = map.getSource("places-source") as GeoJSONSource | undefined;
+      if (!source) return;
+      const zoom = await source.getClusterExpansionZoom(clusterId);
+      map.easeTo({ center: feature.geometry.coordinates as [number, number], zoom, duration: 500 });
+    });
+    map.on("click", "unclustered-point", (event: MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      if (!feature || feature.geometry.type !== "Point") return;
+      const properties = feature.properties || {};
+      const coordinates = feature.geometry.coordinates as [number, number];
+      void openPlaceDetails({
+        place_id: String(properties.place_id || `map_${coordinates[1]}_${coordinates[0]}`),
+        name: String(properties.name || "Local place"),
+        category: String(properties.category || "place"),
+        address: String(properties.address || city.searchName),
+        lat: coordinates[1],
+        lng: coordinates[0],
+      });
+    });
+    for (const layerId of ["clusters", "unclustered-point"]) {
+      map.on("mouseenter", layerId, () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", layerId, () => { map.getCanvas().style.cursor = ""; });
+    }
     map.on("click", "gmaps-building-3d", (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       if (selectedBuildingRef.current !== null) map.removeFeatureState({ source: vectorSourceId, sourceLayer: "building", id: selectedBuildingRef.current });
@@ -667,6 +736,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       }
     });
     map.on("click", (event) => {
+      if (map.queryRenderedFeatures(event.point, { layers: ["clusters", "unclustered-point"] }).length > 0) return;
       const rendered = map.queryRenderedFeatures(event.point);
       const labeled = rendered.filter((candidate) => candidate.layer.type === "symbol" && candidate.properties?.name);
       const feature = labeled.find((candidate) => /^poi_/i.test(candidate.layer.id))
@@ -804,7 +874,6 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       if (data.status === "OK") setSelectedPlace({ place_id: data.place_id, name: data.name, category: "Pinned location", address: data.address, lat, lng });
     });
     return () => {
-      markersRef.current.forEach((marker) => marker.remove());
       routeBadgeMarkersRef.current.forEach((marker) => marker.remove());
       originMarkerRef.current?.remove();
       destMarkerRef.current?.remove();
@@ -859,6 +928,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     if (!style?.layers) return;
     const customLayerIds = new Set([
       "satellite-layer", "dark-mode-overlay", "trichy-hillshade", "gmaps-building-2d", "gmaps-building-3d",
+      "clusters", "cluster-count", "unclustered-point",
       "alt-route-casing", "alt-route-line", "route-casing", "route-line",
       "route-walk-halo", "route-walk-dots", "route-origin-dest-Connectors",
       "gps-accuracy", "gps-position-halo", "gps-position", "gps-walk-path",
@@ -997,7 +1067,9 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
         const center = userLocation ? { lng: userLocation[0], lat: userLocation[1] } : mapRef.current?.getCenter() || { lat: city.center[1], lng: city.center[0] };
         const response = await fetch(`/api/v1/places/search?region=${city.id}&q=${encodeURIComponent(searchQuery)}&lat=${center.lat}&lng=${center.lng}`, { signal: controller.signal });
         const data = await response.json();
-        setSearchResults(data.results || []);
+        const results: Place[] = data.results || [];
+        setSearchResults(results);
+        updatePlacesGeoJSON(results);
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) setSearchResults([]);
       } finally {
@@ -1005,7 +1077,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       }
     }, 280);
     return () => { window.clearTimeout(timer); searchAbortRef.current?.abort(); };
-  }, [city, searchQuery, userLocation]);
+  }, [city, searchQuery, updatePlacesGeoJSON, userLocation]);
 
   useEffect(() => {
     if (!routeField) { setRoutePredictions([]); return; }
@@ -1135,7 +1207,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       if (!response.ok || data.status !== "OK") throw new Error(data.error || "Nearby places are unavailable");
       const places: Place[] = data.places || [];
       setSearchResults(places);
-      renderPlaceMarkers(places);
+      updatePlacesGeoJSON(places);
       if (places.length === 0) setMapError(`No ${category} places were found nearby. Try moving the map or zooming out.`);
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
@@ -1239,7 +1311,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   };
 
   const choosePlace = (place: Place) => {
-    void openPlaceDetails(place); renderPlaceMarkers([place]); setSearchResults([]);
+    void openPlaceDetails(place); updatePlacesGeoJSON([place]); setSearchResults([]);
     mapRef.current?.flyTo({ center: [place.lng, place.lat], zoom: 17, pitch: 55 });
   };
 
