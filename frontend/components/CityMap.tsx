@@ -61,6 +61,12 @@ function ensureRouteLayersOnTop(map: maplibregl.Map) {
   }
 }
 
+function ensureGpsLayersOnTop(map: maplibregl.Map) {
+  for (const layerId of ["gps-accuracy", "gps-position-halo", "gps-position"] as const) {
+    if (map.getLayer(layerId)) map.moveLayer(layerId);
+  }
+}
+
 const CATEGORIES = [
   ["restaurant", "Restaurants"], ["atm", "ATMs & Banks"], ["hospital", "Hospitals"],
   ["pharmacy", "Pharmacies"], ["fuel", "Petrol Bunks"], ["shopping", "Shopping"],
@@ -850,6 +856,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     map.on("mouseenter", "gmaps-building-3d", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "gmaps-building-3d", () => { map.getCanvas().style.cursor = ""; });
     ensureRouteLayersOnTop(map);
+    ensureGpsLayersOnTop(map);
   }, [city.bounds, city.searchName, openPlaceDetails]);
 
   const applyGpsPosition = useCallback((position: GeolocationPosition, moveCamera: boolean) => {
@@ -884,6 +891,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     const point: GeoJSON.Feature<GeoJSON.Point> = { type: "Feature", properties: { accuracy }, geometry: { type: "Point", coordinates } };
     (map.getSource("gps-position-source") as GeoJSONSource | undefined)?.setData(point);
     (map.getSource("gps-accuracy-source") as GeoJSONSource | undefined)?.setData(accuracyCircle(longitude, latitude, accuracy));
+    ensureGpsLayersOnTop(map);
     if (liveNavigationRef.current) {
       originMarkerRef.current?.setLngLat(coordinates);
       if (position.coords.heading !== null && Number.isFinite(position.coords.heading)) {
@@ -893,6 +901,10 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     }
     if (moveCamera || gpsCenterOnNextFixRef.current) {
       gpsCenterOnNextFixRef.current = false;
+      const constrainedBounds = map.getMaxBounds();
+      if (constrainedBounds && !constrainedBounds.contains(coordinates)) {
+        map.setMaxBounds(null);
+      }
       map.flyTo({ center: coordinates, zoom: Math.max(map.getZoom(), 16), duration: 850 });
     }
   }, []);
@@ -1123,6 +1135,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       if (map.getLayer("trichy-hillshade")) map.setLayoutProperty("trichy-hillshade", "visibility", "none");
     }
     ensureRouteLayersOnTop(map);
+    ensureGpsLayersOnTop(map);
   }, [mapReady, mapMode, enable3DBuildings, enable3DTerrain, buildingColor, waterColor, roadColor, buildingScale]);
 
   useEffect(() => {
