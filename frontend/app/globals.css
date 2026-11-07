@@ -147,6 +147,10 @@ mark { background: transparent; font-weight: 700; color: inherit; }
 /* Trichy map workspace */
 .trichy-map-app { position: relative; width: 100vw; height: 100dvh; overflow: hidden; color: #202124; background: #f7f7f8; font-family: Arial, Helvetica, sans-serif; }
 .trichy-map-canvas { position: absolute; inset: 0; }
+.trichy-map-app .maplibregl-ctrl-attrib,
+.trichy-map-app .maplibregl-ctrl-attrib-button {
+  display: none !important;
+}
 .search-stack { position: absolute; z-index: 30; top: 16px; left: 16px; width: min(420px, calc(100vw - 32px)); }
 .map-searchbox { min-height: 54px; display: flex; align-items: center; gap: 11px; padding: 6px 7px 6px 16px; border: 1px solid #dadce0; border-radius: 12px; background: #fff; box-shadow: 0 3px 12px rgba(32,33,36,.2); }
 .menu-button { flex: none; display: grid; place-items: center; width: 32px; height: 32px; margin-left: -7px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }

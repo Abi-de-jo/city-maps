@@ -513,6 +513,9 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     const vectorSourceId = Object.keys(style.sources).find((key) => style.sources[key].type === "vector") || "openmaptiles";
     const firstLabelLayerId = style.layers.find((layer) => layer.type === "symbol" && layer.layout?.["text-field"])?.id;
+    const firstRoadLayerId = style.layers.find(
+      (layer) => layer.type === "line" && /(road|street|highway|transportation)/i.test(layer.id),
+    )?.id || firstLabelLayerId;
     if (!map.getSource("trichy-terrain-dem")) {
       map.addSource("trichy-terrain-dem", { type: "raster-dem", encoding: "terrarium", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 15 });
       map.addLayer({ id: "trichy-hillshade", type: "hillshade", source: "trichy-terrain-dem", layout: { visibility: "none" }, paint: { "hillshade-shadow-color": "#59636f", "hillshade-highlight-color": "#ffffff", "hillshade-exaggeration": 0.28 } }, firstLabelLayerId);
@@ -543,6 +546,32 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
         "raster-resampling": "linear",
       },
     }, firstLabelLayerId);
+    if (!map.getSource("dark-mode-overlay-source")) {
+      map.addSource("dark-mode-overlay-source", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "Polygon",
+            coordinates: [[
+              [city.bounds[0][0], city.bounds[0][1]],
+              [city.bounds[1][0], city.bounds[0][1]],
+              [city.bounds[1][0], city.bounds[1][1]],
+              [city.bounds[0][0], city.bounds[1][1]],
+              [city.bounds[0][0], city.bounds[0][1]],
+            ]],
+          },
+        },
+      });
+      map.addLayer({
+        id: "dark-mode-overlay",
+        type: "fill",
+        source: "dark-mode-overlay-source",
+        layout: { visibility: "none" },
+        paint: { "fill-color": "#111318", "fill-opacity": 0.68 },
+      }, firstRoadLayerId);
+    }
     style.layers.filter((layer) => layer.id.toLowerCase().includes("building")).forEach((layer) => {
       if (map.getLayer(layer.id)) map.removeLayer(layer.id);
     });
@@ -657,7 +686,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     map.on("mouseenter", "gmaps-building-3d", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "gmaps-building-3d", () => { map.getCanvas().style.cursor = ""; });
     ensureRouteLayersOnTop(map);
-  }, [city.searchName, openPlaceDetails]);
+  }, [city.bounds, city.searchName, openPlaceDetails]);
 
   const applyGpsPosition = useCallback((position: GeolocationPosition, moveCamera: boolean) => {
     const map = mapRef.current;
@@ -751,7 +780,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       container: mapContainerRef.current,
       style: "https://tiles.openfreemap.org/styles/liberty",
       center: initialCenter, zoom: initialZoom, pitch: 45, bearing: -10,
-      attributionControl: { compact: true }, maxPitch: 75, maxZoom: 19.8,
+      attributionControl: false, maxPitch: 75, maxZoom: 19.8,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       maxBounds: [
         [city.bounds[0][0], city.bounds[0][1]],
@@ -827,7 +856,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     const style = map.getStyle();
     if (!style?.layers) return;
     const customLayerIds = new Set([
-      "satellite-layer", "trichy-hillshade", "gmaps-building-2d", "gmaps-building-3d",
+      "satellite-layer", "dark-mode-overlay", "trichy-hillshade", "gmaps-building-2d", "gmaps-building-3d",
       "alt-route-casing", "alt-route-line", "route-casing", "route-line",
       "route-walk-halo", "route-walk-dots", "route-origin-dest-Connectors",
       "gps-accuracy", "gps-position-halo", "gps-position", "gps-walk-path",
@@ -843,6 +872,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     const dark = mapMode === "dark";
     if (map.getLayer("satellite-layer")) map.setLayoutProperty("satellite-layer", "visibility", mapMode === "satellite" ? "visible" : "none");
+    if (map.getLayer("dark-mode-overlay")) map.setLayoutProperty("dark-mode-overlay", "visibility", dark ? "visible" : "none");
     if (map.getLayer("gmaps-building-3d")) {
       map.setLayoutProperty("gmaps-building-3d", "visibility", enable3DBuildings ? "visible" : "none");
       map.setPaintProperty("gmaps-building-3d", "fill-extrusion-color", ["case", ["boolean", ["feature-state", "selected"], false], dark ? "#8ab4f8" : "#1a73e8", dark ? "#2a2c30" : buildingColor]);
