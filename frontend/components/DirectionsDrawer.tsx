@@ -15,10 +15,40 @@ const MODES: { value: TravelMode; label: string; icon: typeof Car }[] = [
   { value: "walking", label: "Walk", icon: Footprints },
 ];
 
-function duration(seconds?: number) {
-  if (!seconds) return "—";
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
+function duration(seconds?: number): string {
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return "—";
+  const totalMinutes = Math.round(seconds / 60);
+  if (totalMinutes < 1) return "< 1 min";
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+
+  if (totalHours < 24) {
+    return mins === 0 ? `${totalHours} hr` : `${totalHours} hr ${mins} min`;
+  }
+
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  if (days < 30) {
+    if (hours === 0 && mins === 0) return `${days} ${days === 1 ? "day" : "days"}`;
+    if (hours === 0) return `${days} ${days === 1 ? "day" : "days"} ${mins} min`;
+    return `${days} ${days === 1 ? "day" : "days"} ${hours} hr`;
+  }
+
+  const months = Math.floor(days / 30);
+  const remDays = days % 30;
+
+  if (months < 12) {
+    if (remDays === 0) return `${months} ${months === 1 ? "month" : "months"}`;
+    return `${months} ${months === 1 ? "mo" : "mos"} ${remDays} ${remDays === 1 ? "day" : "days"}`;
+  }
+
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (remMonths === 0) return `${years} ${years === 1 ? "yr" : "yrs"}`;
+  return `${years} ${years === 1 ? "yr" : "yrs"} ${remMonths} mo`;
 }
 
 function distance(meters: number) {

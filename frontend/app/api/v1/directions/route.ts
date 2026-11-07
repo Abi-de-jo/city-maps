@@ -33,12 +33,40 @@ function buildInstruction(step: OsrmStep): string {
   return `${type || "Continue"} ${modifier}${road}`.trim();
 }
 
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.max(1, Math.round(totalSeconds / 60));
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes === 0 ? `${hours} hr` : `${hours} hr ${remainingMinutes} min`;
+function formatDuration(totalSeconds: number): string {
+  if (!totalSeconds || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return "—";
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 1) return "< 1 min";
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+
+  if (totalHours < 24) {
+    return mins === 0 ? `${totalHours} hr` : `${totalHours} hr ${mins} min`;
+  }
+
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  if (days < 30) {
+    if (hours === 0 && mins === 0) return `${days} ${days === 1 ? "day" : "days"}`;
+    if (hours === 0) return `${days} ${days === 1 ? "day" : "days"} ${mins} min`;
+    return `${days} ${days === 1 ? "day" : "days"} ${hours} hr`;
+  }
+
+  const months = Math.floor(days / 30);
+  const remDays = days % 30;
+
+  if (months < 12) {
+    if (remDays === 0) return `${months} ${months === 1 ? "month" : "months"}`;
+    return `${months} ${months === 1 ? "mo" : "mos"} ${remDays} ${remDays === 1 ? "day" : "days"}`;
+  }
+
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (remMonths === 0) return `${years} ${years === 1 ? "yr" : "yrs"}`;
+  return `${years} ${years === 1 ? "yr" : "yrs"} ${remMonths} mo`;
 }
 
 export async function GET(req: NextRequest) {

@@ -89,6 +89,18 @@ const CHENNAI_LANDMARKS: SavedPlace[] = [
   { place_id: "landmark_kapaleeshwarar", name: "Kapaleeshwarar Temple", category: "temple", address: "Mylapore, Chennai", lat: 13.0338, lng: 80.2699 },
   { place_id: "landmark_airport_maa", name: "Chennai International Airport", category: "airport", address: "Meenambakkam, Chennai", lat: 12.9941, lng: 80.1709 },
 ];
+const INDIA_LANDMARKS: SavedPlace[] = [
+  { place_id: "landmark_indiagate", name: "India Gate", category: "monument", address: "Rajpath, New Delhi", lat: 28.6129, lng: 77.2295 },
+  { place_id: "landmark_tajmahal", name: "Taj Mahal", category: "monument", address: "Tajganj, Agra, Uttar Pradesh", lat: 27.1751, lng: 78.0421 },
+  { place_id: "landmark_gateway", name: "Gateway of India", category: "monument", address: "Apollo Bandar, Colaba, Mumbai", lat: 18.9220, lng: 72.8347 },
+  { place_id: "landmark_goldentemple", name: "Golden Temple", category: "temple", address: "Amritsar, Punjab", lat: 31.6200, lng: 74.8765 },
+  { place_id: "landmark_redfort", name: "Red Fort", category: "monument", address: "Chandni Chowk, New Delhi", lat: 28.6562, lng: 77.2410 },
+  { place_id: "landmark_charminar", name: "Charminar", category: "monument", address: "Ghansi Bazaar, Hyderabad", lat: 17.3616, lng: 78.4747 },
+  { place_id: "landmark_meenakshi", name: "Meenakshi Amman Temple", category: "temple", address: "Madurai, Tamil Nadu", lat: 9.9195, lng: 78.1193 },
+  { place_id: "landmark_hawa_mahal", name: "Hawa Mahal", category: "monument", address: "Jaipur, Rajasthan", lat: 26.9239, lng: 75.8267 },
+  { place_id: "landmark_victoria", name: "Victoria Memorial", category: "monument", address: "Maidan, Kolkata, West Bengal", lat: 22.5448, lng: 88.3426 },
+  { place_id: "landmark_bangalore_palace", name: "Bengaluru Palace", category: "monument", address: "Vasanth Nagar, Bengaluru, Karnataka", lat: 12.9988, lng: 77.5921 },
+];
 
 const svgIcon = (content: string) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content}</svg>`;
 
@@ -260,12 +272,40 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return earthRadius * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  if (minutes < 60) return `${Math.max(1, minutes)} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes === 0 ? `${hours} hr` : `${hours} hr ${remainingMinutes} min`;
+function formatDuration(totalSeconds: number): string {
+  if (!totalSeconds || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return "—";
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 1) return "< 1 min";
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+
+  if (totalHours < 24) {
+    return mins === 0 ? `${totalHours} hr` : `${totalHours} hr ${mins} min`;
+  }
+
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  if (days < 30) {
+    if (hours === 0 && mins === 0) return `${days} ${days === 1 ? "day" : "days"}`;
+    if (hours === 0) return `${days} ${days === 1 ? "day" : "days"} ${mins} min`;
+    return `${days} ${days === 1 ? "day" : "days"} ${hours} hr`;
+  }
+
+  const months = Math.floor(days / 30);
+  const remDays = days % 30;
+
+  if (months < 12) {
+    if (remDays === 0) return `${months} ${months === 1 ? "month" : "months"}`;
+    return `${months} ${months === 1 ? "mo" : "mos"} ${remDays} ${remDays === 1 ? "day" : "days"}`;
+  }
+
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (remMonths === 0) return `${years} ${years === 1 ? "yr" : "yrs"}`;
+  return `${years} ${years === 1 ? "yr" : "yrs"} ${remMonths} mo`;
 }
 
 function formatDistance(meters: number) {
@@ -309,61 +349,25 @@ function getOrigin3DMarkerHTML(
   }
 
   if (mode === "cycling") {
+    const flipX = (bearingDeg > 180 && bearingDeg < 360) ? -1 : 1;
     return `
-      <div class="route-origin-model route-origin-vehicle route-origin-bike-3d" aria-hidden="true">
-        <div class="route-origin-bearing" style="transform:rotate(${bearingDeg}deg)">
-          <svg width="54" height="58" viewBox="0 0 64 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <radialGradient id="bikeGround3d" cx="50%" cy="38%" r="68%"><stop stop-color="#fff"/><stop offset=".7" stop-color="#E0F7FA"/><stop offset="1" stop-color="#80DEEA"/></radialGradient>
-              <linearGradient id="bikeTank3d" x1="23" y1="18" x2="42" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#6FF7FF"/><stop offset=".42" stop-color="#00BCD4"/><stop offset="1" stop-color="#006064"/></linearGradient>
-              <radialGradient id="bikeHelmet3d" cx="38%" cy="28%" r="72%"><stop stop-color="#fff"/><stop offset=".22" stop-color="#8AB4F8"/><stop offset=".64" stop-color="#1A73E8"/><stop offset="1" stop-color="#0D47A1"/></radialGradient>
-              <linearGradient id="bikeChrome3d" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".45" stop-color="#90A4AE"/><stop offset="1" stop-color="#ECEFF1"/></linearGradient>
-            </defs>
-            <ellipse cx="32" cy="38" rx="28" ry="27" fill="url(#bikeGround3d)" stroke="#00ACC1" stroke-width="2.5"/>
-            <ellipse cx="32" cy="57" rx="13" ry="5" fill="#004D40" fill-opacity=".3"/>
-            <path d="M20 4 13-4h38L44 4H20Z" fill="#80DEEA" fill-opacity=".42"/>
-            <rect x="27.5" y="5" width="9" height="16" rx="4.5" fill="#202124" stroke="#fff" stroke-width="1.5"/>
-            <rect x="26.5" y="49" width="11" height="16" rx="5.5" fill="#202124" stroke="#fff" stroke-width="1.5"/>
-            <path d="M15 22h34" stroke="url(#bikeChrome3d)" stroke-width="4.5" stroke-linecap="round"/>
-            <circle cx="14" cy="20" r="3.5" fill="#263238" stroke="#fff" stroke-width="1.2"/><circle cx="50" cy="20" r="3.5" fill="#263238" stroke="#fff" stroke-width="1.2"/>
-            <path d="M24 13c0-4 3.5-6.5 8-6.5S40 9 40 13l2.5 17c.5 5-4.5 9-10.5 9s-11-4-10.5-9L24 13Z" fill="url(#bikeTank3d)" stroke="#fff" stroke-width="2"/>
-            <path d="M20 25c3-4 7-5.5 12-5.5S41 21 44 25l-2 13c-.6 4.5-4.5 7-10 7s-9.4-2.5-10-7l-2-13Z" fill="#174EA6" stroke="#fff" stroke-width="1.8"/>
-            <path d="M26 42h12c2 0 3.5 1.7 3 3.7l-2 10H25l-2-10c-.5-2 1-3.7 3-3.7Z" fill="#37474F" stroke="#fff" stroke-width="1.5"/>
-            <circle cx="32" cy="29" r="9" fill="url(#bikeHelmet3d)" stroke="#fff" stroke-width="2"/>
-            <path d="M25 26c3-3.4 11-3.4 14 0-2 2.7-12 2.7-14 0Z" fill="#17212B"/><ellipse cx="29" cy="24" rx="2.5" ry="1.4" fill="#fff" fill-opacity=".72"/>
-            <rect x="28" y="55" width="8" height="3" rx="1.5" fill="#FF1744"/>
-          </svg>
+      <div class="route-origin-model route-origin-compact-marker" aria-hidden="true">
+        <div class="route-origin-compact-pulse"></div>
+        <div class="compact-vehicle-wrapper" style="transform:scaleX(${flipX})">
+          <img src="/bike-marker.png" width="30" height="28" alt="Bike" class="compact-vehicle-img" />
         </div>
       </div>`;
   }
 
+  const flipX = (bearingDeg > 180 && bearingDeg < 360) ? -1 : 1;
   return `
-    <div class="route-origin-model route-origin-vehicle route-origin-car-3d" aria-hidden="true">
-      <div class="route-origin-bearing" style="transform:rotate(${bearingDeg}deg)">
-        <svg width="56" height="64" viewBox="0 0 64 74" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="carGround3d" cx="50%" cy="35%" r="70%"><stop stop-color="#fff"/><stop offset=".72" stop-color="#E8F0FE"/><stop offset="1" stop-color="#8AB4F8"/></radialGradient>
-            <linearGradient id="carBody3d" x1="17" y1="8" x2="48" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".36" stop-color="#F8FAFF"/><stop offset=".72" stop-color="#C6DAFC"/><stop offset="1" stop-color="#7BAAF7"/></linearGradient>
-            <linearGradient id="carRoof3d" x1="23" y1="24" x2="43" y2="49" gradientUnits="userSpaceOnUse"><stop stop-color="#74A7FF"/><stop offset=".45" stop-color="#4285F4"/><stop offset="1" stop-color="#174EA6"/></linearGradient>
-            <linearGradient id="carGlass3d" x1="22" y1="19" x2="43" y2="45" gradientUnits="userSpaceOnUse"><stop stop-color="#D2F4FF"/><stop offset=".28" stop-color="#5F8DB5"/><stop offset="1" stop-color="#17212B"/></linearGradient>
-          </defs>
-          <ellipse cx="32" cy="38" rx="28.5" ry="31" fill="url(#carGround3d)" stroke="#1A73E8" stroke-width="2.5"/>
-          <ellipse cx="32" cy="61" rx="16" ry="6" fill="#174EA6" fill-opacity=".25"/>
-          <rect x="13" y="16" width="6" height="14" rx="3" fill="#202124"/><rect x="45" y="16" width="6" height="14" rx="3" fill="#202124"/>
-          <rect x="13" y="45" width="6" height="14" rx="3" fill="#202124"/><rect x="45" y="45" width="6" height="14" rx="3" fill="#202124"/>
-          <path d="M13 27h6v5h-6c-2 0-2-5 0-5Zm38 0h-6v5h6c2 0 2-5 0-5Z" fill="#1967D2" stroke="#fff" stroke-width="1"/>
-          <path d="M22 7c5-3 15-3 20 0 3 3 5 12 5 25v25c0 7-5 10-15 10S17 64 17 57V32c0-13 2-22 5-25Z" fill="url(#carBody3d)" stroke="#185ABC" stroke-width="2.5"/>
-          <path d="M20 21c4-4 20-4 24 0l-3 10H23l-3-10Z" fill="url(#carGlass3d)" stroke="#fff" stroke-width="1.3"/>
-          <rect x="22.5" y="30" width="19" height="18" rx="5" fill="url(#carRoof3d)" stroke="#fff" stroke-width="1.7"/>
-          <path d="M24 33c3-2 7-2.5 11-1.5" stroke="#fff" stroke-opacity=".62" stroke-width="2" stroke-linecap="round"/>
-          <path d="M23 48h18l3 8c-5 3-19 3-24 0l3-8Z" fill="url(#carGlass3d)" stroke="#fff" stroke-width="1.3"/>
-          <path d="M23 9 20 19M41 9l3 10" stroke="#8AB4F8" stroke-width="1.5" stroke-linecap="round"/>
-          <rect x="20" y="7" width="8" height="3.4" rx="1.7" fill="#B9F6FF"/><rect x="36" y="7" width="8" height="3.4" rx="1.7" fill="#B9F6FF"/>
-          <rect x="20" y="62" width="8" height="3" rx="1.5" fill="#FF1744"/><rect x="36" y="62" width="8" height="3" rx="1.5" fill="#FF1744"/>
-        </svg>
+    <div class="route-origin-model route-origin-compact-marker" aria-hidden="true">
+      <div class="route-origin-compact-pulse"></div>
+      <div class="compact-vehicle-wrapper" style="transform:scaleX(${flipX})">
+        <img src="/car-marker.png" width="32" height="22" alt="Car" class="compact-vehicle-img" />
       </div>
     </div>`;
-}
+  }
 
 type CityMapProps = {
   city: CityConfig;
@@ -411,6 +415,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   const [mapError, setMapError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Place[]>([]);
+  const [showResultsList, setShowResultsList] = useState(false);
   const [searching, setSearching] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -525,9 +530,9 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     originElement.innerHTML = getOrigin3DMarkerHTML(mode, headingDegrees);
     originMarkerRef.current = new maplibregl.Marker({
       element: originElement,
-      anchor: mode === "walking" ? "bottom" : "center",
-      rotationAlignment: mode === "walking" ? "viewport" : "map",
-      pitchAlignment: mode === "walking" ? "viewport" : "map",
+      anchor: "bottom",
+      rotationAlignment: "viewport",
+      pitchAlignment: "viewport",
     }).setLngLat(startPoint).addTo(map);
 
     destMarkerRef.current?.remove();
@@ -607,36 +612,8 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     const firstRoadLayerId = style.layers.find(
       (layer) => layer.type === "line" && /(road|street|highway|transportation)/i.test(layer.id),
     )?.id || firstLabelLayerId;
-    if (!map.getSource("trichy-terrain-dem")) {
-      map.addSource("trichy-terrain-dem", { type: "raster-dem", encoding: "terrarium", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 15 });
-      map.addLayer({ id: "trichy-hillshade", type: "hillshade", source: "trichy-terrain-dem", layout: { visibility: "none" }, paint: { "hillshade-shadow-color": "#59636f", "hillshade-highlight-color": "#ffffff", "hillshade-exaggeration": 0.28 } }, firstLabelLayerId);
-    }
-    if (map.getLayer("satellite-layer")) map.removeLayer("satellite-layer");
-    if (map.getSource("satellite-imagery")) map.removeSource("satellite-imagery");
-    map.addSource("satellite-imagery", {
-      type: "raster",
-      tiles: [
-        "https://mt0.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
-        "https://mt1.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
-        "https://mt2.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
-        "https://mt3.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
-      ],
-      tileSize: 256,
-      minzoom: 0,
-      maxzoom: 20,
-    });
-    map.addLayer({
-      id: "satellite-layer",
-      type: "raster",
-      source: "satellite-imagery",
-      minzoom: 0,
-      maxzoom: 20.5,
-      layout: { visibility: "none" },
-      paint: {
-        "raster-fade-duration": 300,
-        "raster-resampling": "linear",
-      },
-    }, firstLabelLayerId);
+    if (map.getLayer("trichy-hillshade")) map.removeLayer("trichy-hillshade");
+    if (map.getSource("trichy-terrain-dem")) map.removeSource("trichy-terrain-dem");
     if (!map.getSource("dark-mode-overlay-source")) {
       map.addSource("dark-mode-overlay-source", {
         type: "geojson",
@@ -646,11 +623,11 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
           geometry: {
             type: "Polygon",
             coordinates: [[
-              [city.bounds[0][0], city.bounds[0][1]],
-              [city.bounds[1][0], city.bounds[0][1]],
-              [city.bounds[1][0], city.bounds[1][1]],
-              [city.bounds[0][0], city.bounds[1][1]],
-              [city.bounds[0][0], city.bounds[0][1]],
+              [-180, -85],
+              [180, -85],
+              [180, 85],
+              [-180, 85],
+              [-180, -85],
             ]],
           },
         },
@@ -834,6 +811,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       }
     });
     map.on("click", (event) => {
+      setShowResultsList(false);
       if (map.queryRenderedFeatures(event.point, { layers: ["clusters", "unclustered-point"] }).length > 0) return;
       const rendered = map.queryRenderedFeatures(event.point);
       const labeled = rendered.filter((candidate) => candidate.layer.type === "symbol" && candidate.properties?.name);
@@ -895,8 +873,11 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     if (liveNavigationRef.current) {
       originMarkerRef.current?.setLngLat(coordinates);
       if (position.coords.heading !== null && Number.isFinite(position.coords.heading)) {
-        const markerBearing = originMarkerRef.current?.getElement().querySelector<HTMLElement>(".route-origin-bearing");
-        if (markerBearing) markerBearing.style.transform = `rotate(${position.coords.heading}deg)`;
+        const heading = position.coords.heading;
+        const arrow = originMarkerRef.current?.getElement().querySelector<HTMLElement>(".route-origin-bearing-arrow");
+        if (arrow) arrow.style.transform = `rotate(${heading}deg)`;
+        const chassis = originMarkerRef.current?.getElement().querySelector<HTMLElement>(".route-origin-3d-chassis");
+        if (chassis) chassis.style.transform = `scaleX(${(heading > 180 && heading < 360) ? -1 : 1})`;
       }
     }
     if (moveCamera || gpsCenterOnNextFixRef.current) {
@@ -952,16 +933,24 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
     maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
+    const isOverview = initialZoom < 11;
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: "https://tiles.openfreemap.org/styles/liberty",
-      center: initialCenter, zoom: initialZoom, pitch: 45, bearing: -10,
-      attributionControl: false, maxPitch: 75, maxZoom: 19.8,
+      center: initialCenter,
+      zoom: initialZoom,
+      pitch: isOverview ? 0 : 45,
+      bearing: isOverview ? 0 : -10,
+      attributionControl: false,
+      maxPitch: 75,
+      maxZoom: 19.8,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       maxBounds: [
-        [city.bounds[0][0], city.bounds[0][1]],
-        [city.bounds[1][0], city.bounds[1][1]],
+        [65.0, 5.0],
+        [100.0, 38.0],
       ],
+      renderWorldCopies: false,
+      maxTileCacheSize: 150,
     });
     mapRef.current = map;
     (window as unknown as { __cityMap: maplibregl.Map }).__cityMap = map;
@@ -1035,7 +1024,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     const style = map.getStyle();
     if (!style?.layers) return;
     const customLayerIds = new Set([
-      "satellite-layer", "dark-mode-overlay", "trichy-hillshade", "gmaps-building-2d", "gmaps-building-3d",
+      "satellite-layer", "dark-mode-overlay", "hillshade-layer", "gmaps-building-2d", "gmaps-building-3d",
       "clusters", "unclustered-point",
       "alt-route-casing", "alt-route-line", "route-casing", "route-line",
       "route-walk-halo", "route-walk-dots", "route-origin-dest-Connectors",
@@ -1052,7 +1041,36 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     const dark = mapMode === "dark";
     map.getCanvasContainer().style.backgroundColor = mapMode === "satellite" ? "#111318" : "#f8f9fa";
-    if (map.getLayer("satellite-layer")) map.setLayoutProperty("satellite-layer", "visibility", mapMode === "satellite" ? "visible" : "none");
+    if (mapMode === "satellite") {
+      if (!map.getSource("satellite-imagery")) {
+        map.addSource("satellite-imagery", {
+          type: "raster",
+          tiles: [
+            "https://mt0.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+            "https://mt1.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+            "https://mt2.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+            "https://mt3.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+          ],
+          tileSize: 256,
+          minzoom: 0,
+          maxzoom: 20,
+        });
+        const firstLabel = style.layers.find((l) => l.type === "symbol" && l.layout?.["text-field"])?.id;
+        map.addLayer({
+          id: "satellite-layer",
+          type: "raster",
+          source: "satellite-imagery",
+          minzoom: 0,
+          maxzoom: 20.5,
+          layout: { visibility: "visible" },
+          paint: { "raster-fade-duration": 300, "raster-resampling": "linear" },
+        }, firstLabel);
+      } else if (map.getLayer("satellite-layer")) {
+        map.setLayoutProperty("satellite-layer", "visibility", "visible");
+      }
+    } else {
+      if (map.getLayer("satellite-layer")) map.setLayoutProperty("satellite-layer", "visibility", "none");
+    }
     if (map.getLayer("dark-mode-overlay")) map.setLayoutProperty("dark-mode-overlay", "visibility", dark ? "visible" : "none");
     if (map.getLayer("gmaps-building-3d")) {
       map.setLayoutProperty("gmaps-building-3d", "visibility", enable3DBuildings ? "visible" : "none");
@@ -1065,74 +1083,94 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       map.setPaintProperty("gmaps-building-2d", "fill-color", dark ? "#2a2c30" : buildingColor);
       map.setPaintProperty("gmaps-building-2d", "fill-outline-color", dark ? "#3c4043" : "#dadce0");
     }
-    style.layers.forEach((layer) => {
-      if (!map.getLayer(layer.id)) return;
-      const originalPaint = baseLayerPaintRef.current.get(layer.id);
-      if (originalPaint) {
-        for (const key of ["background-color", "fill-color", "fill-outline-color", "line-color", "text-color", "text-halo-color", "text-halo-width"]) {
-          if (originalPaint[key] !== undefined) map.setPaintProperty(layer.id, key as any, originalPaint[key] as any);
+    const hasCustomColors = dark || mapMode === "satellite" || buildingColor !== "#e8eaed" || waterColor !== "#aadaff" || roadColor !== "#ffffff";
+    if (hasCustomColors) {
+      style.layers.forEach((layer) => {
+        if (!map.getLayer(layer.id)) return;
+        const originalPaint = baseLayerPaintRef.current.get(layer.id);
+        if (originalPaint) {
+          for (const key of ["background-color", "fill-color", "fill-outline-color", "line-color", "text-color", "text-halo-color", "text-halo-width"]) {
+            if (originalPaint[key] !== undefined) map.setPaintProperty(layer.id, key as any, originalPaint[key] as any);
+          }
         }
-      }
-      const id = layer.id.toLowerCase();
-      if (layer.type === "background") {
-        map.setPaintProperty(layer.id, "background-color", mapMode === "satellite" ? "#111318" : dark ? "#202124" : "#f8f9fa");
-      }
-      if (layer.type === "fill") {
-        if (id.includes("water")) {
-          map.setPaintProperty(layer.id, "fill-color", dark ? "#1f2a37" : waterColor);
-        } else if (dark) {
-          let fill = "#24262a";
-          if (/park|wood|grass|landcover/.test(id)) fill = "#1d2a22";
-          else if (/hospital|school|pitch|track|cemetery|aeroway|building/.test(id)) fill = "#2a2c30";
-          map.setPaintProperty(layer.id, "fill-color", fill);
-          if (id.includes("building")) map.setPaintProperty(layer.id, "fill-outline-color", "#3c4043");
+        const id = layer.id.toLowerCase();
+        if (layer.type === "background") {
+          map.setPaintProperty(layer.id, "background-color", mapMode === "satellite" ? "#111318" : dark ? "#202124" : "#f8f9fa");
         }
-      }
-      if (layer.type === "line") {
-        if (id.includes("waterway")) {
-          map.setPaintProperty(layer.id, "line-color", dark ? "#1f2a37" : waterColor);
-        } else if (/(road|street|highway|bridge)/i.test(id)) {
-          map.setPaintProperty(
-            layer.id,
-            "line-color",
-            dark
-              ? /casing/i.test(id)
-                ? "#2b2d30"
-                : /motorway|trunk|primary/i.test(id)
+        if (layer.type === "fill") {
+          if (id.includes("water")) {
+            map.setPaintProperty(layer.id, "fill-color", dark ? "#1f2a37" : waterColor);
+          } else if (dark) {
+            let fill = "#24262a";
+            if (/park|wood|grass|landcover/.test(id)) fill = "#1d2a22";
+            else if (/hospital|school|pitch|track|cemetery|aeroway|building/.test(id)) fill = "#2a2c30";
+            map.setPaintProperty(layer.id, "fill-color", fill);
+            if (id.includes("building")) map.setPaintProperty(layer.id, "fill-outline-color", "#3c4043");
+          }
+        }
+        if (layer.type === "line") {
+          if (id.includes("waterway")) {
+            map.setPaintProperty(layer.id, "line-color", dark ? "#1f2a37" : waterColor);
+          } else if (/(road|street|highway|bridge)/i.test(id)) {
+            map.setPaintProperty(
+              layer.id,
+              "line-color",
+              dark
+                ? /casing/i.test(id)
+                  ? "#2b2d30"
+                  : /motorway|trunk|primary/i.test(id)
+                    ? "#5f6368"
+                    : "#4a4d51"
+                : roadColor,
+            );
+          } else if (dark) {
+            map.setPaintProperty(
+              layer.id,
+              "line-color",
+              /rail|transit|aeroway|runway|taxiway|path|pedestrian/i.test(id)
+                ? "#3c4043"
+                : /boundary/i.test(id)
                   ? "#5f6368"
-                  : "#4a4d51"
-              : roadColor,
-          );
-        } else if (dark) {
-          map.setPaintProperty(
-            layer.id,
-            "line-color",
-            /rail|transit|aeroway|runway|taxiway|path|pedestrian/i.test(id)
-              ? "#3c4043"
-              : /boundary/i.test(id)
-                ? "#5f6368"
-                : "#4a4d51",
-          );
+                  : "#4a4d51",
+            );
+          }
         }
-      }
-      if (layer.type === "symbol") {
-        const darkLabels = dark || mapMode === "satellite";
-        map.setPaintProperty(layer.id, "text-color", darkLabels ? "#e8eaed" : "#202124");
-        map.setPaintProperty(layer.id, "text-halo-color", darkLabels ? "rgba(20, 24, 30, 0.96)" : "rgba(255, 255, 255, 0.98)");
-        map.setPaintProperty(layer.id, "text-halo-width", 2.2);
-        map.setPaintProperty(layer.id, "text-halo-blur", 0.4);
-      }
-    });
+        if (layer.type === "symbol") {
+          const darkLabels = dark || mapMode === "satellite";
+          map.setPaintProperty(layer.id, "text-color", darkLabels ? "#e8eaed" : "#202124");
+          map.setPaintProperty(layer.id, "text-halo-color", darkLabels ? "rgba(20, 24, 30, 0.96)" : "rgba(255, 255, 255, 0.98)");
+          map.setPaintProperty(layer.id, "text-halo-width", 2.2);
+          map.setPaintProperty(layer.id, "text-halo-blur", 0.4);
+        }
+      });
+    }
     if (mapMode === "satellite") {
       map.setTerrain(null);
-      if (map.getLayer("trichy-hillshade")) map.setLayoutProperty("trichy-hillshade", "visibility", "none");
+      if (map.getLayer("hillshade-layer")) map.setLayoutProperty("hillshade-layer", "visibility", "none");
       if (!satellitePitchOverrideRef.current && map.getPitch() !== 0) map.easeTo({ pitch: 0, duration: 450 });
-    } else if (enable3DTerrain && map.getSource("trichy-terrain-dem")) {
-      map.setTerrain({ source: "trichy-terrain-dem", exaggeration: 1.5 });
-      map.setLayoutProperty("trichy-hillshade", "visibility", "visible");
+    } else if (enable3DTerrain) {
+      if (!map.getSource("terrain-dem")) {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          encoding: "terrarium",
+          tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          maxzoom: 15,
+        });
+        const firstLabel = style.layers.find((l) => l.type === "symbol" && l.layout?.["text-field"])?.id;
+        map.addLayer({
+          id: "hillshade-layer",
+          type: "hillshade",
+          source: "terrain-dem",
+          layout: { visibility: "visible" },
+          paint: { "hillshade-shadow-color": "#59636f", "hillshade-highlight-color": "#ffffff", "hillshade-exaggeration": 0.28 },
+        }, firstLabel);
+      }
+      map.setTerrain({ source: "terrain-dem", exaggeration: 1.5 });
+      if (map.getLayer("hillshade-layer")) map.setLayoutProperty("hillshade-layer", "visibility", "visible");
     } else {
       map.setTerrain(null);
-      if (map.getLayer("trichy-hillshade")) map.setLayoutProperty("trichy-hillshade", "visibility", "none");
+      if (map.getLayer("hillshade-layer")) map.setLayoutProperty("hillshade-layer", "visibility", "none");
     }
     ensureRouteLayersOnTop(map);
     ensureGpsLayersOnTop(map);
@@ -1193,7 +1231,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   }, [mapReady, travelMode, updateOriginAndDest3DMarkers]);
 
   useEffect(() => {
-    if (searchQuery.trim().length < 2) { setSearchResults([]); return; }
+    if (searchQuery.trim().length < 2) { setSearchResults([]); setShowResultsList(false); return; }
     const timer = window.setTimeout(async () => {
       searchAbortRef.current?.abort();
       const controller = new AbortController();
@@ -1205,6 +1243,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
         const data = await response.json();
         const results: Place[] = data.results || [];
         setSearchResults(results);
+        setShowResultsList(results.length > 0);
         updatePlacesGeoJSON(results);
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) setSearchResults([]);
@@ -1329,8 +1368,25 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   }, [updateOriginAndDest3DMarkers]);
   activateRouteRef.current = activateRoute;
 
+  const clearAllFilters = useCallback(() => {
+    categoryAbortRef.current?.abort();
+    searchAbortRef.current?.abort();
+    setActiveCategory(null);
+    setLoadingCategory(null);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowResultsList(false);
+    setSelectedPlace(null);
+    setMapError("");
+    updatePlacesGeoJSON([]);
+  }, [updatePlacesGeoJSON]);
+
   const handleCategoryClick = async (category: string) => {
     categoryAbortRef.current?.abort();
+    if (activeCategory === category) {
+      clearAllFilters();
+      return;
+    }
     const controller = new AbortController();
     categoryAbortRef.current = controller;
     setActiveCategory(category);
@@ -1351,6 +1407,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       const places: Place[] = (data.places || []).filter((place: Place) => !bounds || bounds.contains([place.lng, place.lat]));
       setSearchResults(places);
       updatePlacesGeoJSON(places);
+      setShowResultsList(false);
       if (places.length === 0) {
         setMapError(
           category === "temple"
@@ -1475,7 +1532,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   };
 
   const choosePlace = (place: Place) => {
-    void openPlaceDetails(place); updatePlacesGeoJSON([place]); setSearchResults([]);
+    void openPlaceDetails(place); updatePlacesGeoJSON([place]); setSearchResults([]); setShowResultsList(false);
     mapRef.current?.flyTo({ center: [place.lng, place.lat], zoom: 17, pitch: 55 });
   };
 
@@ -1586,8 +1643,10 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
         if (liveNavigationRef.current) {
           originMarkerRef.current?.setLngLat(coordinates);
           if (heading !== null && Number.isFinite(heading)) {
-            const markerBearing = originMarkerRef.current?.getElement().querySelector<HTMLElement>(".route-origin-bearing");
-            if (markerBearing) markerBearing.style.transform = `rotate(${heading}deg)`;
+            const arrow = originMarkerRef.current?.getElement().querySelector<HTMLElement>(".route-origin-bearing-arrow");
+            if (arrow) arrow.style.transform = `rotate(${heading}deg)`;
+            const chassis = originMarkerRef.current?.getElement().querySelector<HTMLElement>(".route-origin-3d-chassis");
+            if (chassis) chassis.style.transform = `scaleX(${(heading > 180 && heading < 360) ? -1 : 1})`;
           }
         }
         if (!previousPoint) {
@@ -1670,7 +1729,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     void calculateRoute(destCoord[1], destCoord[0], destQuery, userLocation, travelMode, latestHeadingRef.current);
   }, [userLocation, liveNavigation, destCoord, gpsAccuracy, travelMode]);
 
-  const landmarks = city.id === "trichy" ? TRICHY_LANDMARKS : CHENNAI_LANDMARKS;
+  const landmarks = city.id === "trichy" ? TRICHY_LANDMARKS : city.id === "chennai" ? CHENNAI_LANDMARKS : INDIA_LANDMARKS;
   const selectedPlaceSaved = selectedPlace ? savedPlaces.some((place) => place.place_id === selectedPlace.place_id) : false;
 
   return <main className={`trichy-map-app ${mapMode === "dark" ? "map-dark" : ""}`}>
@@ -1681,14 +1740,42 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       <div className="map-searchbox">
         <button className="menu-button" onClick={() => setShowMenu(true)} aria-label="Open saved places and map menu"><Menu size={20} /></button>
         <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={`Search ${city.name} places, shops, streets`} aria-label="Search places" />
-        {searching ? <span className="search-spinner" aria-label="Searching" /> : <Search size={19} aria-hidden="true" />}
-        <button onClick={() => { if (showRouting) clearRouteOverlays(); setShowRouting((value) => !value); }} className="directions-button"><Navigation size={17} />Directions</button>
+        {searchQuery.trim().length > 0 ? (
+          <button className="search-clear-button" onClick={clearAllFilters} aria-label="Clear search" title="Clear search">
+            <X size={17} />
+          </button>
+        ) : searching ? (
+          <span className="search-spinner" aria-label="Searching" />
+        ) : (
+          <Search size={19} aria-hidden="true" />
+        )}
+        <button onClick={() => { if (showRouting) clearRouteOverlays(); setShowResultsList(false); setShowRouting((value) => !value); }} className="directions-button"><Navigation size={17} />Directions</button>
       </div>
-      {searchResults.length > 0 && <div className="trichy-results">
-        {searchResults.map((place) => <button key={place.place_id} onClick={() => choosePlace(place)}>
-          <MapPin size={17} /><span><strong>{place.name}</strong><small>{place.address}</small></span>{place.distance_meters !== undefined && <em>{place.distance_meters < 1000 ? `${place.distance_meters} m` : `${(place.distance_meters / 1000).toFixed(1)} km`}</em>}
-        </button>)}
-      </div>}
+      {!showRouting && !selectedPlace && showResultsList && searchResults.length > 0 && (
+        <div className="trichy-results">
+          <div className="results-header">
+            <span>{activeCategory ? `${activeCategory} places` : "Search results"} ({searchResults.length})</span>
+            <button className="results-close" onClick={() => setShowResultsList(false)} aria-label="Close list" title="Close list">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="results-list-scroll">
+            {searchResults.map((place) => (
+              <button key={place.place_id} onClick={() => choosePlace(place)}>
+                <MapPin size={17} />
+                <span><strong>{place.name}</strong><small>{place.address}</small></span>
+                {place.distance_meters !== undefined && <em>{place.distance_meters < 1000 ? `${place.distance_meters} m` : `${(place.distance_meters / 1000).toFixed(1)} km`}</em>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {!showRouting && !selectedPlace && !showResultsList && searchResults.length > 0 && (
+        <button className="results-toggle-pill" onClick={() => setShowResultsList(true)} aria-label="Show places list">
+          <MapPin size={14} />
+          <span>Show {activeCategory ? activeCategory : "places"} list ({searchResults.length})</span>
+        </button>
+      )}
     </section>
 
     {showMenu && <aside className="saved-drawer" aria-label="Saved places and map shortcuts">
@@ -1700,11 +1787,26 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     </aside>}
 
     <nav className="category-chips" aria-label="Nearby categories">
+      {(activeCategory !== null || searchQuery.trim().length > 0 || searchResults.length > 0) && (
+        <button className="clear-filters-chip" onClick={clearAllFilters} aria-label="Clear filter" title="Clear active filters and pins">
+          <X size={15} />
+          <span>Clear filter</span>
+        </button>
+      )}
       {CATEGORIES.map(([id, label]) => {
         const loading = loadingCategory === id;
-        return <button key={id} className={activeCategory === id ? "active" : ""} onClick={() => void handleCategoryClick(id)} disabled={loading} aria-busy={loading}>
+        const isActive = activeCategory === id;
+        return <button
+          key={id}
+          className={isActive ? "active" : ""}
+          onClick={() => void handleCategoryClick(id)}
+          disabled={loading}
+          aria-busy={loading}
+          title={isActive ? "Click to clear this filter" : undefined}
+        >
           {loading && <span className="category-spinner" aria-hidden="true" />}
           <span>{loading ? "Loading…" : label}</span>
+          {isActive && <X size={13} style={{ marginLeft: 3 }} />}
         </button>;
       })}
     </nav>

@@ -38,9 +38,10 @@ export default function MapCanvas({ routes, activeRoute, points, onCenter, onAct
         const map = new maplibregl.Map({
           container: container.current,
           style: "https://tiles.openfreemap.org/styles/liberty",
-          center: [78.7047, 10.7905],
-          zoom: 13,
-          maxBounds: [[78.45, 10.60], [78.95, 11.05]],
+          center: [78.9629, 20.5937],
+          zoom: 5,
+          maxBounds: [[65.0, 5.0], [100.0, 38.0]],
+          attributionControl: false,
         });
         mapRef.current = map;
         (window as unknown as { __cityMap: MapLibreMap }).__cityMap = map;

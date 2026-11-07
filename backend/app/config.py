@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     @classmethod
     def parse_bbox(cls, value: object) -> object:
         if isinstance(value, str):
-            values = tuple(float(item.strip()) for item in value.split(","))
+            clean = value.strip("[]() \t\n")
+            values = tuple(float(item.strip()) for item in clean.split(","))
+            if len(values) != 4:
+                raise ValueError("CITY_BBOX must contain MIN_LON,MIN_LAT,MAX_LON,MAX_LAT")
+            return values
+        if isinstance(value, (list, tuple)):
+            values = tuple(float(item) for item in value)
             if len(values) != 4:
                 raise ValueError("CITY_BBOX must contain MIN_LON,MIN_LAT,MAX_LON,MAX_LAT")
             return values
@@ -33,8 +39,9 @@ class Settings(BaseSettings):
     def parse_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        if isinstance(value, (list, tuple)):
+            return [str(item) for item in value]
         return value
-
 
 @lru_cache
 def get_settings() -> Settings:
