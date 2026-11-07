@@ -170,8 +170,10 @@ mark { background: transparent; font-weight: 700; color: inherit; }
 .trichy-results em { color: #5f6368; font-size: 11px; font-style: normal; white-space: nowrap; }
 .category-chips { position: absolute; z-index: 20; top: 18px; left: 454px; right: 16px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .category-chips::-webkit-scrollbar { display: none; }
-.category-chips button { flex: none; height: 38px; border: 1px solid #dadce0; border-radius: 8px; padding: 0 13px; background: #fff; box-shadow: 0 2px 6px rgba(32,33,36,.16); cursor: pointer; font-size: 12px; font-weight: 700; }
+.category-chips button { flex: none; height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #dadce0; border-radius: 8px; padding: 0 13px; background: #fff; box-shadow: 0 2px 6px rgba(32,33,36,.16); cursor: pointer; font-size: 12px; font-weight: 700; }
 .category-chips button:hover,.category-chips button.active { border-color: #1a73e8; color: #174ea6; background: #e8f0fe; }
+.category-chips button:disabled { cursor: wait; opacity: .82; }
+.category-spinner { width: 13px; height: 13px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: search-spin .65s linear infinite; }
 .route-panel { position: absolute; z-index: 29; top: 80px; left: 16px; width: min(390px, calc(100vw - 32px)); max-height: calc(100dvh - 108px); overflow-y: auto; border: 1px solid #dadce0; border-radius: 14px; padding: 16px; background: #fff; box-shadow: 0 8px 30px rgba(32,33,36,.23); }
 .route-panel header,.map-studio header { display: flex; align-items: center; justify-content: space-between; }
 .route-panel header div span,.route-panel header div strong { display: block; }

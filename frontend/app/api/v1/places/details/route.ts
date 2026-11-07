@@ -221,7 +221,7 @@ export async function GET(req: NextRequest) {
     const zoom = 19;
     const tileX = Math.floor(((lng + 180) / 360) * 2 ** zoom);
     const tileY = Math.floor(((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2) * 2 ** zoom);
-    const aerialUrl = `https://mt1.google.com/vt/lyrs=s&x=${tileX}&y=${tileY}&z=${zoom}&scale=2`;
+    const aerialUrl = `https://mt1.google.com/vt/lyrs=s&x=${tileX}&y=${tileY}&z=${zoom}`;
     const resolvedName = tags.name || tags["name:en"] || (!isPlaceholderName(cleanName) ? cleanName : "") || nominatim.name || nominatim.address?.amenity || "Selected place";
     const usableRawCategory = /^(fill-extrusion|building|place|location|point)$/i.test(rawCategory) ? "" : rawCategory;
     const resolvedCategory = tags.shop || tags.amenity || tags.tourism || tags.healthcare || usableRawCategory || "place";

@@ -313,6 +313,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   const directionsAbortRef = useRef<AbortController | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const routeSearchAbortRef = useRef<AbortController | null>(null);
+  const categoryAbortRef = useRef<AbortController | null>(null);
   const detailsAbortRef = useRef<AbortController | null>(null);
   const walkWatchRef = useRef<number | null>(null);
   const walkTimerRef = useRef<number | null>(null);
@@ -326,6 +327,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   const [searching, setSearching] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
   const [showRouting, setShowRouting] = useState(false);
   const [originQuery, setOriginQuery] = useState(city.defaultOriginLabel);
   const [destQuery, setDestQuery] = useState("");
@@ -525,10 +527,10 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     map.addSource("satellite-imagery", {
       type: "raster",
       tiles: [
-        "https://mt0.google.com/vt/lyrs=s&hl=en&gl=IN&scale=2&x={x}&y={y}&z={z}",
-        "https://mt1.google.com/vt/lyrs=s&hl=en&gl=IN&scale=2&x={x}&y={y}&z={z}",
-        "https://mt2.google.com/vt/lyrs=s&hl=en&gl=IN&scale=2&x={x}&y={y}&z={z}",
-        "https://mt3.google.com/vt/lyrs=s&hl=en&gl=IN&scale=2&x={x}&y={y}&z={z}",
+        "https://mt0.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt1.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt2.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt3.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
       ],
       tileSize: 256,
       minzoom: 0,
@@ -1120,11 +1122,15 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
   activateRouteRef.current = activateRoute;
 
   const handleCategoryClick = async (category: string) => {
+    categoryAbortRef.current?.abort();
+    const controller = new AbortController();
+    categoryAbortRef.current = controller;
     setActiveCategory(category);
+    setLoadingCategory(category);
     setMapError("");
     const center = userLocation ? { lng: userLocation[0], lat: userLocation[1] } : mapRef.current?.getCenter() || { lat: city.center[1], lng: city.center[0] };
     try {
-      const response = await fetch(`/api/v1/places/nearby?region=${city.id}&category=${category}&lat=${center.lat}&lng=${center.lng}&radius_meters=6000`);
+      const response = await fetch(`/api/v1/places/nearby?region=${city.id}&category=${category}&lat=${center.lat}&lng=${center.lng}&radius_meters=6000`, { signal: controller.signal });
       const data = await response.json();
       if (!response.ok || data.status !== "OK") throw new Error(data.error || "Nearby places are unavailable");
       const places: Place[] = data.places || [];
@@ -1132,7 +1138,11 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       renderPlaceMarkers(places);
       if (places.length === 0) setMapError(`No ${category} places were found nearby. Try moving the map or zooming out.`);
     } catch (error) {
-      setMapError(error instanceof Error ? error.message : "Nearby places could not be loaded");
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setMapError(error instanceof Error ? error.message : "Nearby places could not be loaded");
+      }
+    } finally {
+      if (categoryAbortRef.current === controller) setLoadingCategory(null);
     }
   };
 
@@ -1454,7 +1464,13 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     </aside>}
 
     <nav className="category-chips" aria-label="Nearby categories">
-      {CATEGORIES.map(([id, label]) => <button key={id} className={activeCategory === id ? "active" : ""} onClick={() => void handleCategoryClick(id)}>{label}</button>)}
+      {CATEGORIES.map(([id, label]) => {
+        const loading = loadingCategory === id;
+        return <button key={id} className={activeCategory === id ? "active" : ""} onClick={() => void handleCategoryClick(id)} disabled={loading} aria-busy={loading}>
+          {loading && <span className="category-spinner" aria-hidden="true" />}
+          <span>{loading ? "Loading…" : label}</span>
+        </button>;
+      })}
     </nav>
 
     {showRouting && <aside className="route-panel">
