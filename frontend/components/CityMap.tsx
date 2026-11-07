@@ -127,6 +127,75 @@ function poiMarkerPresentation(category: string) {
   return { kind: "place", icon: svgIcon('<path d="M4 20h16M6 17V9h12v8M8 9l4-5 4 5M10 13h4v4"/>') };
 }
 
+const POI_MARKER_COLORS: Record<string, string> = {
+  food: "#e8710a", money: "#188038", medical: "#d93025", pharmacy: "#9334e6",
+  fuel: "#5f6368", shopping: "#a142f4", worship: "#b06000", hotel: "#1a73e8",
+  transit: "#1967d2", education: "#137333", airport: "#185abc", parking: "#1967d2",
+  place: "#5f6368",
+};
+
+function poiMarkerImage(category: string) {
+  const marker = poiMarkerPresentation(category);
+  const canvas = document.createElement("canvas");
+  canvas.width = 48;
+  canvas.height = 58;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Place pin canvas is unavailable");
+  context.fillStyle = "rgba(32,33,36,.22)";
+  context.beginPath();
+  context.ellipse(24, 53, 9, 3, 0, 0, Math.PI * 2);
+  context.fill();
+  context.beginPath();
+  context.moveTo(24, 1);
+  context.bezierCurveTo(12.4, 1, 3, 10.4, 3, 22);
+  context.bezierCurveTo(3, 36.4, 24, 55, 24, 55);
+  context.bezierCurveTo(24, 55, 45, 36.4, 45, 22);
+  context.bezierCurveTo(45, 10.4, 35.6, 1, 24, 1);
+  context.closePath();
+  context.fillStyle = POI_MARKER_COLORS[marker.kind] || POI_MARKER_COLORS.place;
+  context.fill();
+  context.strokeStyle = "#fff";
+  context.lineWidth = 2.5;
+  context.stroke();
+  context.strokeStyle = "#fff";
+  context.fillStyle = "#fff";
+  context.lineWidth = 2;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  const line = (...points: number[]) => {
+    context.beginPath();
+    context.moveTo(points[0], points[1]);
+    for (let index = 2; index < points.length; index += 2) context.lineTo(points[index], points[index + 1]);
+    context.stroke();
+  };
+  if (marker.kind === "food") {
+    line(18, 12, 18, 31); line(15, 12, 15, 19, 21, 19, 21, 12); line(29, 12, 29, 31); line(29, 12, 33, 20, 29, 20);
+  } else if (marker.kind === "money") {
+    line(14, 17, 24, 11, 34, 17); line(15, 30, 33, 30); line(18, 18, 18, 28); line(24, 18, 24, 28); line(30, 18, 30, 28);
+  } else if (marker.kind === "medical" || marker.kind === "pharmacy") {
+    context.fillRect(21, 11, 6, 21); context.fillRect(14, 18, 20, 7);
+  } else if (marker.kind === "fuel") {
+    context.strokeRect(15, 12, 12, 19); context.strokeRect(18, 15, 6, 6); line(27, 16, 32, 20, 32, 29);
+  } else if (marker.kind === "shopping") {
+    context.strokeRect(15, 17, 18, 15); context.beginPath(); context.arc(24, 17, 5, Math.PI, 0); context.stroke();
+  } else if (marker.kind === "worship") {
+    line(14, 20, 24, 11, 34, 20); line(17, 20, 17, 31, 31, 31, 31, 20); line(21, 31, 21, 23, 27, 23, 27, 31);
+  } else if (marker.kind === "hotel") {
+    line(14, 12, 14, 32); context.strokeRect(16, 20, 18, 9); line(14, 29, 35, 29, 35, 32); context.strokeRect(17, 16, 7, 4);
+  } else if (marker.kind === "transit") {
+    context.strokeRect(15, 11, 18, 19); line(15, 20, 33, 20); context.beginPath(); context.arc(19, 27, 1.5, 0, Math.PI * 2); context.arc(29, 27, 1.5, 0, Math.PI * 2); context.fill();
+  } else if (marker.kind === "education") {
+    line(13, 18, 24, 12, 35, 18, 24, 24, 13, 18); line(18, 22, 18, 28, 30, 28, 30, 22); line(35, 18, 35, 27);
+  } else if (marker.kind === "airport") {
+    line(14, 27, 34, 13); line(21, 13, 24, 20, 33, 21); line(19, 24, 15, 20); line(25, 23, 29, 31);
+  } else if (marker.kind === "parking") {
+    context.font = "bold 22px Arial"; context.textAlign = "center"; context.fillText("P", 24, 30);
+  } else {
+    context.beginPath(); context.arc(24, 20, 7, 0, Math.PI * 2); context.stroke(); context.beginPath(); context.arc(24, 20, 2.5, 0, Math.PI * 2); context.fill();
+  }
+  return { id: `poi-${marker.kind}`, data: context.getImageData(0, 0, canvas.width, canvas.height) };
+}
+
 function accuracyCircle(lng: number, lat: number, radiusMeters: number): GeoJSON.Feature<GeoJSON.Polygon> {
   const points = 64;
   const latitudeDegrees = radiusMeters / 111_320;
@@ -399,6 +468,8 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     if (!map) return;
     const source = map.getSource("places-source") as GeoJSONSource | undefined;
     if (!source) return;
+    const clusterIcon = poiMarkerImage(places[0]?.category || "place").id;
+    if (map.getLayer("clusters")) map.setLayoutProperty("clusters", "icon-image", clusterIcon);
     const featureCollection: GeoJSON.FeatureCollection<GeoJSON.Point> = {
       type: "FeatureCollection",
       features: places.map((place) => ({
@@ -409,6 +480,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
           name: place.name,
           category: place.category,
           address: place.address || "",
+          icon_id: poiMarkerImage(place.category || "place").id,
         },
       })),
     };
@@ -496,7 +568,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     setTrackedSeconds(0);
   }, []);
 
-  const setupCustomLayers = useCallback((map: maplibregl.Map) => {
+  const setupCustomLayers = useCallback(async (map: maplibregl.Map) => {
     const style = map.getStyle();
     style.layers.forEach((layer) => {
       baseLayerVisibilityRef.current.set(layer.id, layer.layout?.visibility || "visible");
@@ -525,10 +597,10 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     map.addSource("satellite-imagery", {
       type: "raster",
       tiles: [
-        "https://mt0.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
-        "https://mt1.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
-        "https://mt2.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
-        "https://mt3.google.com/vt/lyrs=s&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt0.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt1.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt2.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
+        "https://mt3.google.com/vt/lyrs=y&hl=en&gl=IN&x={x}&y={y}&z={z}",
       ],
       tileSize: 256,
       minzoom: 0,
@@ -542,7 +614,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       maxzoom: 20.5,
       layout: { visibility: "none" },
       paint: {
-        "raster-fade-duration": 0,
+        "raster-fade-duration": 300,
         "raster-resampling": "linear",
       },
     }, firstLabelLayerId);
@@ -577,47 +649,44 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     map.addLayer({ id: "gmaps-building-2d", type: "fill", source: vectorSourceId, "source-layer": "building", minzoom: 13, paint: { "fill-color": "#f1f3f4", "fill-outline-color": "#dadce0", "fill-opacity": 0.85 } }, firstLabelLayerId);
     map.addLayer({ id: "gmaps-building-3d", type: "fill-extrusion", source: vectorSourceId, "source-layer": "building", minzoom: 14, paint: { "fill-extrusion-color": ["case", ["boolean", ["feature-state", "selected"], false], "#1a73e8", buildingColor], "fill-extrusion-height": ["*", buildingScale, ["coalesce", ["get", "render_height"], ["get", "height"], 9]], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], ["get", "min_height"], 0], "fill-extrusion-opacity": 0.92, "fill-extrusion-vertical-gradient": true } }, firstLabelLayerId);
+    const markerCategories = ["restaurant", "atm", "hospital", "pharmacy", "fuel", "shopping", "temple", "hotel", "bus", "school", "airport", "parking", "place"];
+    for (const category of markerCategories) {
+      const marker = poiMarkerImage(category);
+      if (!map.hasImage(marker.id)) {
+        map.addImage(marker.id, marker.data, { pixelRatio: 1.5 });
+      }
+    }
     map.addSource("places-source", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
       cluster: true,
-      clusterMaxZoom: 15,
+      clusterMaxZoom: 12,
       clusterRadius: 50,
     });
     map.addLayer({
       id: "clusters",
-      type: "circle",
-      source: "places-source",
-      filter: ["has", "point_count"],
-      paint: {
-        "circle-color": ["step", ["get", "point_count"], "#51bbd6", 10, "#f1f075", 30, "#f28cb1"],
-        "circle-radius": ["step", ["get", "point_count"], 20, 10, 25, 30, 30],
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "#ffffff",
-      },
-    });
-    map.addLayer({
-      id: "cluster-count",
       type: "symbol",
       source: "places-source",
       filter: ["has", "point_count"],
       layout: {
-        "text-field": "{point_count_abbreviated}",
-        "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-        "text-size": 13,
+        "icon-image": "poi-place",
+        "icon-size": 1,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
       },
-      paint: { "text-color": "#202124" },
     });
     map.addLayer({
       id: "unclustered-point",
-      type: "circle",
+      type: "symbol",
       source: "places-source",
       filter: ["!", ["has", "point_count"]],
-      paint: {
-        "circle-radius": 9,
-        "circle-color": "#ea4335",
-        "circle-stroke-width": 2.5,
-        "circle-stroke-color": "#ffffff",
+      layout: {
+        "icon-image": ["get", "icon_id"],
+        "icon-size": 1,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
       },
     });
     if (!map.getSource("alt-route-source")) map.addSource("alt-route-source", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -861,10 +930,14 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     });
     mapRef.current = map;
     (window as unknown as { __cityMap: maplibregl.Map }).__cityMap = map;
-    map.on("load", () => {
+    map.on("load", async () => {
       map.setMaxZoom(19.8);
-      setupCustomLayers(map);
-      setMapReady(true);
+      try {
+        await setupCustomLayers(map);
+        setMapReady(true);
+      } catch (error) {
+        setMapError(error instanceof Error ? error.message : "Map layers could not be initialized");
+      }
     });
     map.on("error", (event) => setMapError(event.error?.message || "Map data could not be loaded"));
     map.on("contextmenu", async (event) => {
@@ -928,7 +1001,7 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     if (!style?.layers) return;
     const customLayerIds = new Set([
       "satellite-layer", "dark-mode-overlay", "trichy-hillshade", "gmaps-building-2d", "gmaps-building-3d",
-      "clusters", "cluster-count", "unclustered-point",
+      "clusters", "unclustered-point",
       "alt-route-casing", "alt-route-line", "route-casing", "route-line",
       "route-walk-halo", "route-walk-dots", "route-origin-dest-Connectors",
       "gps-accuracy", "gps-position-halo", "gps-position", "gps-walk-path",
@@ -939,10 +1012,11 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       map.setLayoutProperty(
         layer.id,
         "visibility",
-        mapMode === "satellite" && layer.type !== "symbol" ? "none" : originalVisibility,
+        mapMode === "satellite" && layer.type !== "symbol" && layer.type !== "background" ? "none" : originalVisibility,
       );
     });
     const dark = mapMode === "dark";
+    map.getCanvasContainer().style.backgroundColor = mapMode === "satellite" ? "#111318" : "#f8f9fa";
     if (map.getLayer("satellite-layer")) map.setLayoutProperty("satellite-layer", "visibility", mapMode === "satellite" ? "visible" : "none");
     if (map.getLayer("dark-mode-overlay")) map.setLayoutProperty("dark-mode-overlay", "visibility", dark ? "visible" : "none");
     if (map.getLayer("gmaps-building-3d")) {
@@ -965,8 +1039,8 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
         }
       }
       const id = layer.id.toLowerCase();
-      if (layer.type === "background" && dark) {
-        map.setPaintProperty(layer.id, "background-color", "#202124");
+      if (layer.type === "background") {
+        map.setPaintProperty(layer.id, "background-color", mapMode === "satellite" ? "#111318" : dark ? "#202124" : "#f8f9fa");
       }
       if (layer.type === "fill") {
         if (id.includes("water")) {
@@ -1200,15 +1274,22 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     setActiveCategory(category);
     setLoadingCategory(category);
     setMapError("");
-    const center = userLocation ? { lng: userLocation[0], lat: userLocation[1] } : mapRef.current?.getCenter() || { lat: city.center[1], lng: city.center[0] };
+    const map = mapRef.current;
+    const center = map?.getCenter() || { lat: city.center[1], lng: city.center[0] };
+    const bounds = map?.getBounds();
+    const northEast = bounds?.getNorthEast();
+    const viewportRadius = northEast
+      ? calculateDistanceMeters(center.lat, center.lng, northEast.lat, northEast.lng)
+      : 6_000;
+    const radius = Math.min(15_000, Math.max(500, Math.ceil(viewportRadius * 1.1)));
     try {
-      const response = await fetch(`/api/v1/places/nearby?region=${city.id}&category=${category}&lat=${center.lat}&lng=${center.lng}&radius_meters=6000`, { signal: controller.signal });
+      const response = await fetch(`/api/v1/places/nearby?region=${city.id}&category=${category}&lat=${center.lat}&lng=${center.lng}&radius_meters=${radius}&limit=200`, { signal: controller.signal });
       const data = await response.json();
       if (!response.ok || data.status !== "OK") throw new Error(data.error || "Nearby places are unavailable");
-      const places: Place[] = data.places || [];
+      const places: Place[] = (data.places || []).filter((place: Place) => !bounds || bounds.contains([place.lng, place.lat]));
       setSearchResults(places);
       updatePlacesGeoJSON(places);
-      if (places.length === 0) setMapError(`No ${category} places were found nearby. Try moving the map or zooming out.`);
+      if (places.length === 0) setMapError(`No ${category} places were found in this map view. Pan or zoom out to search another area.`);
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         setMapError(error instanceof Error ? error.message : "Nearby places could not be loaded");
@@ -1217,6 +1298,21 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
       if (categoryAbortRef.current === controller) setLoadingCategory(null);
     }
   };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !activeCategory) return;
+    let refreshTimer: number | null = null;
+    const refreshVisibleCategory = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void handleCategoryClick(activeCategory), 280);
+    };
+    map.on("moveend", refreshVisibleCategory);
+    return () => {
+      map.off("moveend", refreshVisibleCategory);
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+    };
+  }, [activeCategory, mapReady]);
 
   const calculateRoute = async (
     destLat: number,
