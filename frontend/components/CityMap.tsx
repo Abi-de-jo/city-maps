@@ -196,6 +196,19 @@ function poiMarkerImage(category: string) {
   return { id: `poi-${marker.kind}`, data: context.getImageData(0, 0, canvas.width, canvas.height) };
 }
 
+function circleImageData(size: number, color: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Route marker canvas is unavailable");
+  context.beginPath();
+  context.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+  context.fillStyle = color;
+  context.fill();
+  return context.getImageData(0, 0, size, size);
+}
+
 function accuracyCircle(lng: number, lat: number, radiusMeters: number): GeoJSON.Feature<GeoJSON.Polygon> {
   const points = 64;
   const latitudeDegrees = radiusMeters / 111_320;
@@ -656,6 +669,8 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
         map.addImage(marker.id, marker.data, { pixelRatio: 1.5 });
       }
     }
+    if (!map.hasImage("walking-dot-halo")) map.addImage("walking-dot-halo", circleImageData(18, "#ffffff"), { pixelRatio: 2 });
+    if (!map.hasImage("walking-dot-blue")) map.addImage("walking-dot-blue", circleImageData(13, "#4285f4"), { pixelRatio: 2 });
     map.addSource("places-source", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
@@ -728,24 +743,32 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     }, firstLabelLayerId);
     map.addLayer({
       id: "route-walk-halo",
-      type: "line",
+      type: "symbol",
       source: "route-source",
-      layout: { "line-join": "round", "line-cap": "round", visibility: "none" },
-      paint: {
-        "line-color": "#ffffff",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 8, 18, 12],
-        "line-dasharray": [0.01, 1.8],
+      layout: {
+        visibility: "none",
+        "symbol-placement": "line",
+        "symbol-spacing": 28,
+        "icon-image": "walking-dot-halo",
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 18, 1.35],
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "icon-rotation-alignment": "map",
       },
     }, firstLabelLayerId);
     map.addLayer({
       id: "route-walk-dots",
-      type: "line",
+      type: "symbol",
       source: "route-source",
-      layout: { "line-join": "round", "line-cap": "round", visibility: "none" },
-      paint: {
-        "line-color": "#4285f4",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 5.5, 18, 9],
-        "line-dasharray": [0.01, 1.8],
+      layout: {
+        visibility: "none",
+        "symbol-placement": "line",
+        "symbol-spacing": 28,
+        "icon-image": "walking-dot-blue",
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 18, 1.35],
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "icon-rotation-alignment": "map",
       },
     }, firstLabelLayerId);
     map.addLayer({
@@ -1101,6 +1124,32 @@ export default function CityMap({ city, initialCenter, initialZoom }: CityMapPro
     }
     ensureRouteLayersOnTop(map);
   }, [mapReady, mapMode, enable3DBuildings, enable3DTerrain, buildingColor, waterColor, roadColor, buildingScale]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !map.getLayer("gps-position-halo")) return;
+    if (gpsStatus !== "active") {
+      map.setPaintProperty("gps-position-halo", "circle-radius", 13);
+      map.setPaintProperty("gps-position-halo", "circle-opacity", 0.2);
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      map.setPaintProperty("gps-position-halo", "circle-radius", 16);
+      map.setPaintProperty("gps-position-halo", "circle-opacity", 0.22);
+      return;
+    }
+    let animationFrame = 0;
+    const pulseDuration = 1_650;
+    const animatePulse = (timestamp: number) => {
+      const phase = (timestamp % pulseDuration) / pulseDuration;
+      const eased = 1 - (1 - phase) ** 2;
+      map.setPaintProperty("gps-position-halo", "circle-radius", 10 + eased * 23);
+      map.setPaintProperty("gps-position-halo", "circle-opacity", (1 - phase) * 0.34);
+      animationFrame = window.requestAnimationFrame(animatePulse);
+    };
+    animationFrame = window.requestAnimationFrame(animatePulse);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [gpsStatus, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
