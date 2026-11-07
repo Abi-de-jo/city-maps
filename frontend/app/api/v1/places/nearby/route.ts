@@ -10,15 +10,15 @@ const CATEGORY_MAP: Record<string, string> = {
   fuel: '["amenity"="fuel"]',
   hotel: '["tourism"~"hotel|guest_house|hostel"]',
   shopping: '["shop"~"supermarket|mall|convenience|clothes|electronics|jewelry|department_store"]',
-  temple: '["amenity"="place_of_worship"]["religion"="hindu"]["name"]',
+  temple: '["amenity"="place_of_worship"]["name"]',
   bus: '["highway"="bus_stop"]',
 };
 
-const GENERIC_TEMPLE_NAMES = new Set(["temple", "hindu temple", "place of worship", "amman kovil", "shivan kovil"]);
+const GENERIC_WORSHIP_NAMES = new Set(["temple", "hindu temple", "place of worship", "amman kovil", "shivan kovil", "church", "mosque"]);
 
-function isNamedTemple(name: string, type?: string) {
+function isNamedWorshipPlace(name: string, type?: string) {
   const normalized = name.trim().toLowerCase();
-  return type === "place_of_worship" && !GENERIC_TEMPLE_NAMES.has(normalized) && !normalized.includes("pond");
+  return type === "place_of_worship" && !GENERIC_WORSHIP_NAMES.has(normalized) && !normalized.includes("pond");
 }
 
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -35,7 +35,7 @@ function toNearbyPlace(element: any, category: string, lat: number, lng: number,
   if (!placeLat || !placeLng) return null;
   const name = element.tags?.name || element.tags?.["name:en"] || element.tags?.["name:ta"] || "Local Place";
   const placeCategory = element.tags?.amenity || element.tags?.shop || element.tags?.tourism || category;
-  if (category === "temple" && !isNamedTemple(name, placeCategory)) return null;
+  if (category === "temple" && !isNamedWorshipPlace(name, placeCategory)) return null;
   return {
     place_id: `osm_${element.type}_${element.id}`,
     name,
@@ -61,10 +61,10 @@ export async function GET(req: NextRequest) {
   const safeCategory = category.replace(/[^a-z_]/g, "") || "restaurant";
   const osmFilter = CATEGORY_MAP[safeCategory] || `["amenity"="${safeCategory}"]`;
   const overpassLimit = Math.min(Math.max(limit * 10, 200), 500);
-  const query = `[out:json][timeout:10];(node${osmFilter}(around:${radius},${lat},${lng});way${osmFilter}(around:${radius},${lat},${lng}););out center tags ${overpassLimit};`;
+  const query = `[out:json][timeout:8];(node${osmFilter}(around:${radius},${lat},${lng});way${osmFilter}(around:${radius},${lat},${lng});relation${osmFilter}(around:${radius},${lat},${lng}););out center tags ${overpassLimit};`;
 
   try {
-    const elements = await queryOverpass(query, 10_000).catch(() => [] as any[]);
+    const elements = await queryOverpass(query, 8_000).catch(() => [] as any[]);
     const unique = new globalThis.Map<string, any>();
     for (const element of elements) {
       const place = toNearbyPlace(element, safeCategory, lat, lng, city.searchName);
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     }
   } catch {}
 
-  const terms = safeCategory === "temple" ? ["temple", "kovil"] : [safeCategory];
+  const terms = safeCategory === "temple" ? ["place of worship"] : [safeCategory];
   const latitudeDegrees = radius / 111_320;
   const longitudeDegrees = radius / (111_320 * Math.cos(lat * Math.PI / 180));
   const minLon = Math.max(-180, lng - longitudeDegrees);
@@ -93,13 +93,11 @@ export async function GET(req: NextRequest) {
     return response.json();
   }));
   const fallback = responses.flatMap((result) => result.status === "fulfilled" ? result.value : []);
-  if (!fallback.length) {
-    return NextResponse.json({ status: "ERROR", places: [], error: "Places services are unavailable" }, { status: 502 });
-  }
+  if (!fallback.length) return NextResponse.json({ status: "OK", count: 0, places: [], source: "providers-unavailable" });
   const unique = new globalThis.Map<string, any>();
   for (const item of fallback) {
     const name = item.namedetails?.name || item.name || item.display_name?.split(",")[0] || "";
-    if (safeCategory === "temple" && !isNamedTemple(name, item.type)) continue;
+    if (safeCategory === "temple" && !isNamedWorshipPlace(name, item.type)) continue;
     const placeLat = parseFloat(item.lat);
     const placeLng = parseFloat(item.lon);
     const placeDistance = distanceMeters(lat, lng, placeLat, placeLng);

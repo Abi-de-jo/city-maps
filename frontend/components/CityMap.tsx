@@ -70,7 +70,7 @@ function ensureGpsLayersOnTop(map: maplibregl.Map) {
 const CATEGORIES = [
   ["restaurant", "Restaurants"], ["atm", "ATMs & Banks"], ["hospital", "Hospitals"],
   ["pharmacy", "Pharmacies"], ["fuel", "Petrol Bunks"], ["shopping", "Shopping"],
-  ["temple", "Temples"], ["hotel", "Hotels"],
+  ["temple", "Worship"], ["hotel", "Hotels"],
 ] as const;
 
 const TRICHY_LANDMARKS: SavedPlace[] = [
