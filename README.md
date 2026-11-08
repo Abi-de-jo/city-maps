@@ -60,7 +60,7 @@ Follow for tutorials, source code, and full-stack software development projects:
 - **Node.js 22+**
 - **npm** (or pnpm / yarn / bun)
 
-### 1. Clone & Install
+### 1. Fork/Clone & Install
 ```bash
 git clone https://github.com/Abi-de-jo/city-maps.git
 cd city-maps/frontend
